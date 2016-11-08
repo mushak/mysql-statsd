@@ -1,3 +1,4 @@
 from innodb_preprocessor import InnoDBPreprocessor
 from mysql_preprocessor import MysqlPreprocessor
 from columns_preprocessor import ColumnsPreprocessor
+from table_preprocessor import TablePreprocessor
