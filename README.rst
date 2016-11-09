@@ -1,34 +1,18 @@
 ===============================
 
-Deprication
-===========
-This project is no longer supported by Spil Games and has been adopted by `DB-Art <https://github.com/db-art/>`_.
-
-The new repository can be found here:
-`MySQL-StatsD @ DB-Art <https://github.com/db-art/mysql-statsd>`_
-
-
 mysql-statsd
 ===============================
 
 Daemon that gathers statistics from MySQL and sends them to statsd.
 
 -  Free software: BSD license
--  Documentation: http://mysql-statsd.rtfd.org.
 
 
 Usage / Installation
 ====================
 
-Install mysql\_statsd through pip(pip is a python package manager,
-please don't use sudo!):
+...
 
-::
-
-    pip install mysql_statsd
-
-If all went well, you'll now have a new executable called mysql\_statsd
-in your path.
 
 Running mysql\_statsd
 ---------------------
@@ -79,6 +63,8 @@ currently we're supporting these:
 
 -  MySQL 5.1
 -  MySQL 5.5
+-  MySQL 5.6
+-  MySQL 5.7
 -  Galera
 
 Both MySQL versions supported with Percona flavour as well as vanilla.
@@ -88,7 +74,6 @@ Todo:
 
 Support for the following platforms
 
--  Mysql 5.6
 -  MariaDB
 
 We're looking forward to your pull request for other platforms
@@ -152,20 +137,29 @@ MySQL
 -----
 The MySQL section allows you to configure the credentials of your mysql host
 (preferrably on localhost) and the queries + timings for the metrics.
-The queries and timings are configured through the stats_types configurable,
+The queries and timings are configured through the stats configurable,
 so take for instance following example:
 ::
-    stats_types = status, innodb
+    stats = status, innodb, slave
 This will execute both the query_status and query_innodb on the MySQL server.
 The frequency can then be controlled through the time (in milliseconds) set in
 the interval_status and interval_innodb.
 The complete configuration would be:
 ::
-    stats_types = status, innodb
+    stats = status, innodb, slave
     query_status = SHOW GLOBAL STATUS
     interval_status = 1000
+    prefix_status = status
+    type_status = rows
     query_innodb = SHOW ENGINE INNODB STATUS
     interval_innodb = 10000
+    prefix_innodb = innodb
+    type_innodb = innodb
+    query_slave = SHOW SLAVE STATUS
+    interval_slave = 1000
+    prefix_slave = slave
+    type_slave = columns
+
 
 A special case is the query_commit: as the connection opened by mysql_statsd 
 will be kept open and auto commit is turned off by default the status 
@@ -178,9 +172,10 @@ Now here is the interesting part of mysql_statsd: if you wish to keep track
 of your own application data inside your application database you *could* 
 create your own custom query this way. So for example:
 ::
-    stats_types = myapp
+    stats = myapp
     query_myapp = SELECT some_metric_name, some_metric_value FROM myapp.metric_table WHERE metric_ts >= DATE_SUB(NOW(), interval 1 MINUTE)
     interval_myapp = 60000
+    type_myapp = rows
 
 This will query your application database every 60 seconds, fetch all the 
 metrics that have changed since then and send them through StatsD.
