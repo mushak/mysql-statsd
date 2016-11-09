@@ -58,15 +58,20 @@ class MysqlStatsd():
         # Set up queue
         self.queue = Queue.Queue()
 
-        # split off config for each thread
-        mysql_config = dict(mysql=self.config['mysql'])
-        mysql_config['metrics'] = self.config['metrics']
+        monitor_threads = []
+        for monitor in [item for item in self.config if item.startswith('monitor-')]:
+            name = monitor[len('monitor-'):]
+            config = dict(mysql=self.config['monitor-' + name])
+            config['metrics'] = self.config['metrics-' + name]
+
+            type = self.config[monitor].get('type', 'null')
+
+            if type == 'null':
+                continue
+            if type == 'mysql':
+                monitor_threads.append(ThreadMySQL(queue=self.queue, **config))
 
         statsd_config = self.config['statsd']
-
-        # Spawn MySQL polling thread
-        mysql_thread = ThreadMySQL(queue=self.queue, **mysql_config)
-        # t1 = ThreadMySQL(config=self.config, queue=self.queue)
 
         # Spawn Statsd flushing thread
         statsd_thread = ThreadStatsd(queue=self.queue, **statsd_config)
@@ -79,7 +84,7 @@ class MysqlStatsd():
             statsd_thread.debug = True
 
         # Get thread manager
-        tm = ThreadManager(threads=[mysql_thread, statsd_thread])
+        tm = ThreadManager(threads=monitor_threads + [statsd_thread])
 
         try:
             tm.run()
