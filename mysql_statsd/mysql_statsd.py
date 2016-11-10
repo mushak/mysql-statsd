@@ -62,7 +62,8 @@ class MysqlStatsd():
         for monitor in [item for item in self.config if item.startswith('monitor-')]:
             name = monitor[len('monitor-'):]
             config = dict(mysql=self.config['monitor-' + name])
-            config['metrics'] = self.config['metrics-' + name]
+            config['metrics'] = dict((k, v) for (k, v) in self.config['metrics-' + name].items() if k.find('*') == -1)
+            config['patterns'] = dict((k, v) for (k, v) in self.config['metrics-' + name].items() if k.find('*') > 0)
 
             type = self.config[monitor].get('type', 'null')
 

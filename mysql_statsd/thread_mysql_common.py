@@ -1,5 +1,6 @@
 import time
 import re
+import fnmatch
 import MySQLdb as mdb
 import traceback
 from thread_base import ThreadBase
@@ -19,6 +20,9 @@ class ThreadMySQLCommon(ThreadBase):
     reconnect_delay = 5
     stats_checks = {}
     check_lastrun = {}
+    metrics = {}
+    patterns = {}
+    blacklist = []
 
     def __init__(self, *args, **kwargs):
         super(ThreadMySQLCommon, self).__init__(*args, **kwargs)
@@ -60,6 +64,7 @@ class ThreadMySQLCommon(ThreadBase):
 
         #Which metrics do we allow to be sent to the backend?
         self.metrics = config_dict.get('metrics')
+        self.patterns = config_dict.get('patterns')
 
         return self.host, self.port, self.sleep_interval
 
@@ -97,6 +102,24 @@ class ThreadMySQLCommon(ThreadBase):
             pass
 
     def _run(self):
+        def send_metric(metric_key, value):
+            # Only allow the whitelisted metrics to be sent off to Statsd
+            if metric_key in self.metrics:
+                metric_type = self.metrics.get(metric_key)
+                self.queue.put((metric_key, value, metric_type))
+                return
+            else:
+                # Ignore blacklisted metrics
+                if metric_key not in self.blacklist:
+                    for pattern in self.patterns:
+                        if fnmatch.fnmatch(metric_key, pattern):
+                            # Whitelist full metric for faster lookups
+                            self.metrics[metric_key] = self.patterns.get(pattern)
+                            send_metric(metric_key, value)
+                            return
+                    # Blacklist metric
+                    self.blacklist.append(metric_key)
+ 
         for stat in self.stats_checks:
             prefix = self.stats_checks[stat]['prefix']
 
@@ -136,10 +159,7 @@ class ThreadMySQLCommon(ThreadBase):
                             metric_type = self.metrics.get(whitelist_key)
                             self.queue.put((metric_key, value, metric_type))
                     else:
-                        # Only allow the whitelisted metrics to be sent off to Statsd
-                        if metric_key in self.metrics:
-                            metric_type = self.metrics.get(metric_key)
-                            self.queue.put((metric_key, value, metric_type))
+                        send_metric(metric_key, value)
                 self.check_lastrun[stat] = time_now
 
     def _preprocess(self, check_type, column_names, rows):

@@ -59,7 +59,11 @@ class ThreadStatsd(ThreadBase):
                 sender(k, float(delta))
         else:
             sender = self.get_sender(t)
-            sender(k, float(v))
+            try:
+                sender(k, float(v))
+            except ValueError:
+                print("{0}: {1} is not a numeric value".format(k, v))
+                pass
 
     def get_delta(self, k, v):
         if k in self.data:
